@@ -178,7 +178,7 @@ function Dashboard() {
   const filteredData = filterData(sensingData, startDate, endDate, approvalWindow, selectedCreators);
 
   return (
-<    Container>
+    <Container>
       <Box bgcolor="white" boxShadow={3} p={3} borderRadius={2} my={4}>
         <Grid container spacing={3}>
           <CreatorFilter selectedCreators={selectedCreators} setSelectedCreators={setSelectedCreators} />

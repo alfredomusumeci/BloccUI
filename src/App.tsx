@@ -1,11 +1,12 @@
 import React from 'react';
 import './App.css';
-import Dashboard from './Dashboard'; 
+import Home from './Home';
 
 function App() {
   return (
     <div className="App">
-      <Dashboard />  {/* Render the Dashboard component */}
+      {/* <Linechart /> */}
+      <Home />
     </div>
   );
 }
