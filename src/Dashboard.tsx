@@ -1,14 +1,44 @@
 import React, { useState } from 'react';
 import {
   Container, Table, TableHead, TableRow, TableCell, TableBody, TablePagination, Box,
-  TextField, Grid, Button,Select, MenuItem, FormControl, InputLabel, Checkbox, ListItemText
+  TextField, Grid, Button, Select, MenuItem, FormControl, InputLabel, Checkbox, ListItemText,
+  Modal, Card, List, ListItem, Typography
 } from '@mui/material';
+import {
+  getRowColor
+} from './utils';
 
 // Mock data
 const sensingData = [
-  { creator: 'dummy1', timestamp: 1677644867000, temperature: 25.5, approvals: 3, txId: 'tx123', chaincode: 'sensing' },
-  { creator: 'dummy2', timestamp: 1677648867000, temperature: 26.2, approvals: 5, txId: 'tx124', chaincode: 'sensing' },
-  { creator: 'dummy1', timestamp: 1677649867000, txId: 'tx125', chaincode: 'bscc', referenceTransaction: 'tx123'},
+  { 
+    creator: 'dummy1', 
+    timestamp: 1677644867000, 
+    temperature: 25.5, 
+    approvals: [
+      { approvidngTxId: "tx122252", mspId: "Container2MSP" },
+      { approvidngTxId: "tx122223", mspId: "Container3MSP" }
+    ], 
+    txId: 'tx123', 
+    chaincode: 'sensing' 
+  },
+  { 
+    creator: 'dummy2', 
+    timestamp: 1677648867000, 
+    temperature: 26.2, 
+    approvals: [
+      { approvidngTxId: "tx125224", mspId: "Container4MSP" },
+      { approvidngTxId: "tx122225", mspId: "Container5MSP" }
+    ], 
+    txId: 'tx124', 
+    chaincode: 'sensing' 
+  },
+  { 
+    creator: 'dummy1', 
+    timestamp: 1677649867000, 
+    txId: 'tx125', 
+    chaincode: 'bscc', 
+    referenceTransaction: 'tx123'
+  },
   // ... more sensing data
 ];
 
@@ -16,11 +46,12 @@ interface SensingDataItem {
   creator: string;
   timestamp: number;
   temperature?: number;
-  approvals?: number;
+  approvals?: { approvidngTxId: string; mspId: string }[];  // Updated approvals to be an array of objects
   txId: string;
   chaincode: string;
   referenceTransaction?: string;
 }
+
 
 const filterData = (
   data: SensingDataItem[],
@@ -153,6 +184,64 @@ function ApprovalFilter({ approvalWindow, setApprovalWindow }: { approvalWindow:
   );
 }
 
+function ContentModal({ isOpen, onClose, data }: { isOpen: boolean, onClose: () => void, data: SensingDataItem }) {
+  return (
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      aria-labelledby="content-modal-title"
+      aria-describedby="content-modal-description"
+    >
+      <Box 
+        sx={{ 
+          bgcolor: 'background.paper', 
+          border: '1px solid #000', 
+          boxShadow: 24, 
+          p: 4 
+        }}
+        style={{ 
+          top: '50%', 
+          left: '50%', 
+          transform: 'translate(-50%, -50%)', 
+          position: 'absolute', 
+          width: 400 
+        }}>
+        {data.chaincode === 'sensing' ? (
+          <>
+            <Typography id="content-modal-title" variant="h6" component="h2">
+              Sensing Data
+            </Typography>
+            <Typography id="content-modal-description" variant="body2" color="textSecondary" component="p">
+              Temperature: {data.temperature}°C
+            </Typography>
+            <Typography variant="body2" color="textSecondary" component="p">
+              Timestamp: {new Date(data.timestamp).toLocaleString()}
+            </Typography>
+            <Card variant="outlined" style={{ marginTop: 16, maxHeight: '150px', overflow: 'auto' }}>
+              <List>
+                {data.approvals?.map((approval, index) => (
+                  <ListItem key={approval.approvidngTxId} style={{ backgroundColor: index % 2 === 0 ? '#f5f5f5' : 'transparent' }}>
+                    TxID: {approval.approvidngTxId}, MSP: {approval.mspId}
+                  </ListItem>
+                ))}
+              </List>
+            </Card>
+          </>
+        ) : (
+          <>
+            <Typography id="content-modal-title" variant="h6" component="h2">
+              BSCC Data
+            </Typography>
+            <Typography variant="body2" color="textSecondary" component="p">
+              Approved Transaction ID: {data.referenceTransaction}
+            </Typography>
+          </>
+        )}
+      </Box>
+    </Modal>
+  );
+}
+
 function Dashboard() {
   // Pagination
   const [page, setPage] = useState(0);
@@ -167,6 +256,20 @@ function Dashboard() {
 
   // Creators
   const [selectedCreators, setSelectedCreators] = useState<string[]>([]);
+
+  // Modal
+  const [isModalOpen, setModalOpen] = useState(false);
+  const [selectedData, setSelectedData] = useState<SensingDataItem | null>(null);
+
+  const handleOpenModal = (data: SensingDataItem) => {
+    setSelectedData(data);
+    setModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedData(null);
+    setModalOpen(false);
+  };
 
   // Reset filters
   const resetFilters = () => {
@@ -198,28 +301,32 @@ function Dashboard() {
             <TableRow>
               <TableCell>Creator</TableCell>
               <TableCell>Timestamp</TableCell>
-              <TableCell>Temperature</TableCell>
-              <TableCell>Approvals</TableCell>
               <TableCell>Transaction ID</TableCell>
               <TableCell>Chaincode</TableCell>
-              <TableCell>Approved</TableCell>
+              <TableCell>Content</TableCell>
             </TableRow>
           </TableHead>
-          <TableBody>
-            {filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((data) => (
-              <TableRow key={data.txId}>
-                <TableCell>{data.creator}</TableCell>
-                <TableCell>{new Date(data.timestamp).toLocaleString()}</TableCell>
-                <TableCell>{data.temperature}°C</TableCell>
-                <TableCell>{data.approvals}</TableCell>
-                <TableCell>{data.txId}</TableCell>
-                <TableCell>{data.chaincode}</TableCell>
-                <TableCell>{data.referenceTransaction}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </Box>
+        <TableBody>
+              {filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((data) => (
+                <TableRow 
+                  key={data.txId}
+                  style={{ 
+                    backgroundColor: data.chaincode === 'sensing' ? getRowColor(data.approvals?.length) : 'transparent' 
+                  }}>
+                  <TableCell>{data.creator}</TableCell>
+                  <TableCell>{new Date(data.timestamp).toLocaleString()}</TableCell>
+                  <TableCell>{data.txId}</TableCell>
+                  <TableCell>{data.chaincode}</TableCell>
+                  <TableCell>
+                    <Button onClick={() => handleOpenModal(data)}>View</Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Box>
+        {selectedData && <ContentModal isOpen={isModalOpen} onClose={handleCloseModal} data={selectedData} />}
+
       <TablePagination
         component="div"
         count={filteredData.length}
