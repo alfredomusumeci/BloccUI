@@ -1,10 +1,18 @@
 import React, { useState } from 'react';
 import {
   Container, Table, TableHead, TableRow, TableCell, TableBody, TablePagination, Box,
-  TextField, Grid, Button
+  TextField, Grid, Button,Select, MenuItem, FormControl, InputLabel, Checkbox, ListItemText
 } from '@mui/material';
 
 function Dashboard() {
+  // Mock data
+  const sensingData = [
+    { creator: 'dummy1', timestamp: 1677644867000, temperature: 25.5, approvals: 3, txId: 'tx123', chaincode: 'sensing' },
+    { creator: 'dummy2', timestamp: 1677648867000, temperature: 26.2, approvals: 5, txId: 'tx124', chaincode: 'sensing' },
+    { creator: 'dummy1', timestamp: 1677649867000, txId: 'tx125', chaincode: 'bscc', referenceTransaction: 'tx123'},
+    // ... more sensing data
+  ];
+
   // Pagination
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -13,8 +21,12 @@ function Dashboard() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  // Approal Window
+  // Approval Window
   const [approvalWindow, setApprovalWindow] = useState<string | null>(null);
+
+  // Creators
+  const [selectedCreators, setSelectedCreators] = useState<string[]>([]);
+  const uniqueCreators = Array.from(new Set(sensingData.map(data => data.creator)));
 
   // Reset filters
   const resetFilters = () => {
@@ -23,16 +35,8 @@ function Dashboard() {
     setApprovalWindow(null);
   };
 
-  // Mock data
-  const sensingData = [
-    { timestamp: 1677644867000, temperature: 25.5, approvals: 3, txId: 'tx123', chaincode: 'sensing' },
-    { timestamp: 1677648867000, temperature: 26.2, approvals: 5, txId: 'tx124', chaincode: 'sensing' },
-    { timestamp: 1677649867000, txId: 'tx125', chaincode: 'bscc', referenceTransaction: 'tx123'},
-    // ... more sensing data
-  ];
-
   const handleFilter = () => {
-    let filteredByDate = sensingData;
+    let filteredData = sensingData;
 
     // Date and Time Filtering
     if (startDate || endDate) {
@@ -44,15 +48,14 @@ function Dashboard() {
             endTimestamp = new Date(startDate).setHours(23, 59, 59, 999);
         }
 
-        filteredByDate = sensingData.filter(data => data.timestamp >= startTimestamp && data.timestamp <= endTimestamp);
+        filteredData = filteredData.filter(data => data.timestamp >= startTimestamp && data.timestamp <= endTimestamp);
     }
 
     // Approval Window Filtering
     if (approvalWindow !== null) {
       const approvalWindowMillis = Number(approvalWindow);
 
-      return filteredByDate
-        .filter(data => {
+      filteredData = filteredData.filter(data => {
             if (data.chaincode === 'bscc') return false; // Exclude approval transactions from the displayed data
 
             const approvalTransaction = sensingData.find(item => item.chaincode === 'bscc' && item.referenceTransaction === data.txId);
@@ -61,9 +64,14 @@ function Dashboard() {
             const approvalTimeDifference = approvalTransaction.timestamp - data.timestamp;
             return approvalTimeDifference <= approvalWindowMillis;
         });
-      }
-    
-    return filteredByDate;
+    }
+
+    // Creator Filtering
+    if (selectedCreators.length > 0) {
+        filteredData = filteredData.filter(data => selectedCreators.includes(data.creator));
+    }
+
+    return filteredData;
 };
 
   const filteredData = handleFilter();
@@ -72,6 +80,28 @@ function Dashboard() {
 <    Container>
       <Box bgcolor="white" boxShadow={3} p={3} borderRadius={2} my={4}>
         <Grid container spacing={3}>
+            <Grid item xs={10}>
+                <FormControl fullWidth>
+                    <InputLabel>Filter by Creator</InputLabel>
+                    <Select
+                        multiple
+                        value={selectedCreators}
+                        onChange={(e) => setSelectedCreators(e.target.value as string[])}
+                        renderValue={(selected) => (selected as string[]).join(', ')}
+                        label="Filter by Creator"
+                    >
+                        {uniqueCreators.map((creator) => (
+                            <MenuItem key={creator} value={creator}>
+                              <Checkbox checked={selectedCreators.indexOf(creator) > -1} />
+                              <ListItemText primary={creator} />
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+            </Grid>
+        </Grid>
+
+        <Grid container spacing={3} marginTop={0}>
           <Grid item xs={5}>
             <TextField
               label="Start Date & Time"
@@ -118,6 +148,7 @@ function Dashboard() {
         <Table>
           <TableHead>
             <TableRow>
+              <TableCell>Creator</TableCell>
               <TableCell>Timestamp</TableCell>
               <TableCell>Temperature</TableCell>
               <TableCell>Approvals</TableCell>
@@ -129,6 +160,7 @@ function Dashboard() {
           <TableBody>
             {filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((data) => (
               <TableRow key={data.txId}>
+                <TableCell>{data.creator}</TableCell>
                 <TableCell>{new Date(data.timestamp).toLocaleString()}</TableCell>
                 <TableCell>{data.temperature}°C</TableCell>
                 <TableCell>{data.approvals}</TableCell>
