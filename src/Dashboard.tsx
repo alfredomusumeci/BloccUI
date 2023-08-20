@@ -9,38 +9,62 @@ function Dashboard() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  // Filters
+  // Date & Time
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
+  // Approal Window
+  const [approvalWindow, setApprovalWindow] = useState<string | null>(null);
+
   // Reset filters
-  const resetDates = () => {
+  const resetFilters = () => {
     setStartDate('');
     setEndDate('');
+    setApprovalWindow(null);
   };
 
   // Mock data
   const sensingData = [
-    { timestamp: 1677644867000, temperature: 25.5, approvals: 3, txId: 'tx123' },
-    { timestamp: 1677648867000, temperature: 26.2, approvals: 5, txId: 'tx124' },
+    { timestamp: 1677644867000, temperature: 25.5, approvals: 3, txId: 'tx123', chaincode: 'sensing' },
+    { timestamp: 1677648867000, temperature: 26.2, approvals: 5, txId: 'tx124', chaincode: 'sensing' },
+    { timestamp: 1677649867000, txId: 'tx125', chaincode: 'bscc', referenceTransaction: 'tx123'},
     // ... more sensing data
   ];
 
   const handleFilter = () => {
-    if (!startDate && !endDate) {
-      return sensingData; // Return all data if no dates are set
+    let filteredByDate = sensingData;
+
+    // Date and Time Filtering
+    if (startDate || endDate) {
+        let startTimestamp = startDate ? new Date(startDate).getTime() : Number.MIN_SAFE_INTEGER;
+        let endTimestamp = endDate ? new Date(endDate).getTime() : Number.MAX_SAFE_INTEGER;
+
+        if (startDate && !startDate.includes('T')) {
+            startTimestamp = new Date(startDate).setHours(0, 0, 0, 0);
+            endTimestamp = new Date(startDate).setHours(23, 59, 59, 999);
+        }
+
+        filteredByDate = sensingData.filter(data => data.timestamp >= startTimestamp && data.timestamp <= endTimestamp);
     }
 
-    let startTimestamp = startDate ? new Date(startDate).getTime() : Number.MIN_SAFE_INTEGER;
-    let endTimestamp = endDate ? new Date(endDate).getTime() : Number.MAX_SAFE_INTEGER;
+    // Approval Window Filtering
+    if (approvalWindow !== null) {
+      const approvalWindowMillis = Number(approvalWindow);
 
-    if (startDate && !startDate.includes('T')) {
-      startTimestamp = new Date(startDate).setHours(0, 0, 0, 0);
-      endTimestamp = new Date(startDate).setHours(23, 59, 59, 999);
-    }
+      return filteredByDate
+        .filter(data => {
+            if (data.chaincode === 'bscc') return false; // Exclude approval transactions from the displayed data
 
-    return sensingData.filter(data => data.timestamp >= startTimestamp && data.timestamp <= endTimestamp);
-  };
+            const approvalTransaction = sensingData.find(item => item.chaincode === 'bscc' && item.referenceTransaction === data.txId);
+            if (!approvalTransaction) return false;
+
+            const approvalTimeDifference = approvalTransaction.timestamp - data.timestamp;
+            return approvalTimeDifference <= approvalWindowMillis;
+        });
+      }
+    
+    return filteredByDate;
+};
 
   const filteredData = handleFilter();
 
@@ -71,12 +95,26 @@ function Dashboard() {
           <Grid item xs={2} container alignItems="center">
             <Button 
               variant="outlined" 
-              onClick={resetDates} 
+              onClick={resetFilters} 
               style={{ height: '100%', color: 'red', borderColor: 'red' }}>
               Reset
             </Button>
           </Grid>
         </Grid>
+
+        {/* Approval Window Filter */}
+        <Grid container spacing={3} marginTop={0}>
+          <Grid item xs={10}>
+            <TextField
+              label="Approval Window (ms)"
+              type="number"
+              value={approvalWindow}
+              onChange={(e) => setApprovalWindow(e.target.value || null)}
+              fullWidth
+            />
+          </Grid>
+        </Grid>
+
         <Table>
           <TableHead>
             <TableRow>
@@ -84,6 +122,8 @@ function Dashboard() {
               <TableCell>Temperature</TableCell>
               <TableCell>Approvals</TableCell>
               <TableCell>Transaction ID</TableCell>
+              <TableCell>Chaincode</TableCell>
+              <TableCell>Approved</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -93,6 +133,8 @@ function Dashboard() {
                 <TableCell>{data.temperature}°C</TableCell>
                 <TableCell>{data.approvals}</TableCell>
                 <TableCell>{data.txId}</TableCell>
+                <TableCell>{data.chaincode}</TableCell>
+                <TableCell>{data.referenceTransaction}</TableCell>
               </TableRow>
             ))}
           </TableBody>
